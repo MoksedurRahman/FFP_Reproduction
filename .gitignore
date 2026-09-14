@@ -1,0 +1,32 @@
+# =========================================================
+# FFP Reproduction - Data
+# =========================================================
+
+# Exclude all raw EEG data
+data/
+
+# Exclude all raw EEG data
+#data/raw/
+
+# Exclude processed/intermediate datasets
+#data/processed/
+
+# Exclude MATLAB data files anywhere in the project
+*.mat
+
+# =========================================================
+# Results that may contain large/generated data
+# =========================================================
+
+# Uncomment if you don't want generated results in GitHub
+# results/
+
+# Uncomment if you don't want generated figures in GitHub
+# figures/
+
+# =========================================================
+# MATLAB temporary files
+# =========================================================
+
+*.asv
+*.m~
