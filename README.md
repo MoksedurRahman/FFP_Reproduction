@@ -409,14 +409,6 @@ MATLAB R2024b Update 8
 Windows 11
 ```
 
-Currently installed:
-
-- Deep Learning Toolbox
-- Image Processing Toolbox
-- Signal Processing Toolbox
-
-The Statistics and Machine Learning Toolbox licence is available, but functions such as `fitcsvm` are currently not available in the installation.
-
 ## How to Run
 
 ### 1. Obtain the dataset
