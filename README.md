@@ -8,7 +8,7 @@ MATLAB implementation and initial experimental reproduction of the EEG feature-g
 
 This project implements and investigates the FFP-based EEG processing methodology described in the paper.
 
-The current aims are to:
+The current aims are to: 
 
 1. Understand the published methodology.
 2. Implement the individual stages in MATLAB.
