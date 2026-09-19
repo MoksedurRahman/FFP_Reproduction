@@ -4,23 +4,23 @@ MATLAB implementation of the method described in:
 
 **Tuncer, T., Doğan, S., & Subasi, A. (2021).**  
 *A New Fractal Pattern Feature Generation Function based Emotion Recognition Method using EEG.*  
-Chaos, Solitons & Fractals, 144, 110671.  
+*Chaos, Solitons & Fractals*, 144, 110671.  
 DOI: 10.1016/j.chaos.2021.110671
 
-This repository follows the processing steps, parameters, feature construction and classifiers described in the paper. The descriptions below briefly explain how each part of the paper is represented in the MATLAB code.
+This repository follows the processing steps, parameters, feature construction and classifiers described in the paper. The sections below explain the paper's method and show how the MATLAB implementation represents each stage.
 
 ---
 
 ## 1. Method Overview
 
-The paper presents an EEG emotion-recognition method based on the **Firat Fractal Pattern (FFP)** feature-generation function. FFP is combined with **Tunable Q-factor Wavelet Transform (TQWT)** and **Iterative Chi-square (IChi2)** feature selection before classification.
+The paper presents an EEG emotion-recognition method based on the **Firat Fractal Pattern (FFP)** feature-generation function. FFP is combined with the **Tunable Q-factor Wavelet Transform (TQWT)** and **Iterative Chi-square (IChi2)** feature selection before classification.
 
 The MATLAB implementation follows this sequence:
 
 ```text
 GAMEEMO EEG
     ↓
-Segmentation
+Five non-overlapping segments
     ↓
 FFP feature extraction
     ↓
@@ -76,7 +76,7 @@ G4 = Funny
 
 The dataset-loading code reads the GAMEEMO recordings and prepares individual EEG channels for feature extraction.
 
-The implementation divides each 38,252-sample recording into five non-overlapping segments of 7,650 samples:
+The implementation divides each 38,252-sample recording into **five non-overlapping segments** of 7,650 samples:
 
 ```text
 38,252 samples
@@ -86,11 +86,11 @@ The implementation divides each 38,252-sample recording into five non-overlappin
 2 samples remaining
 ```
 
-This produces:
+Thus, for each channel:
 
 ```text
 28 subjects × 4 classes × 5 segments
-= 560 instances per channel
+= 560 instances
 ```
 
 Main code:
@@ -136,13 +136,13 @@ The resulting feature vector is:
 4 × 256 = 1,024 features
 ```
 
-The binary comparison used in the code is:
+The binary comparison used in the implementation is equivalent to the paper's signum rule:
 
 ```matlab
 bit = double(initialPoint >= endpoint);
 ```
 
-and the map value is generated using:
+The map value is generated using:
 
 ```matlab
 mapValue = sum(bits .* 2.^(0:7));
@@ -215,7 +215,7 @@ external/TQWT/
 
 ## 5. Feature Vector Construction
 
-The paper's feature-generation process combines the FFP representation of the original EEG with the FFP representations obtained from the TQWT components.
+The feature-generation process combines the FFP representation of the original EEG with the FFP representations obtained from the TQWT components.
 
 The MATLAB code stores the resulting features sequentially:
 
@@ -241,32 +241,46 @@ Thus, every EEG segment produces:
 31,744 features
 ```
 
+For the complete channel dataset:
+
+```text
+560 instances × 31,744 features
+```
+
 ---
 
 ## 6. Chi-square Feature Ranking
 
 The paper uses Chi-square feature ranking after min-max normalization.
 
-The normalization is implemented as:
+The normalization used in the implementation is:
 
 ```matlab
-X_norm(:,h) = ...
-    (X(:,h) - min(X(:,h))) / ...
-    (max(X(:,h)) - min(X(:,h)));
+xmin = min(X,[],1);
+xmax = max(X,[],1);
+featureRange = xmax - xmin;
+featureRange(featureRange == 0) = 1;
+XNorm = (X - xmin) ./ featureRange;
 ```
 
-The MATLAB implementation performs the feature ranking using:
+The current MATLAB implementation performs Chi-square feature ranking using the Statistics and Machine Learning Toolbox:
 
 ```matlab
 [idx, scores] = fscchi2(XNorm, target);
 ```
 
-The output `idx` contains the feature indices in ranked order.
+Here:
+
+- `idx` contains feature indices in ranked order.
+- `scores` contains the corresponding Chi-square scores.
+
+The ranking is then supplied to the IChi2 procedure.
 
 Main code:
 
 ```text
 src/chiSquareRanking.m
+src/IChi2.m
 ```
 
 ---
@@ -275,13 +289,13 @@ src/chiSquareRanking.m
 
 The paper introduces an **Iterative Chi-square (IChi2)** feature-selection procedure. After Chi-square ranking, different numbers of the highest-ranked features are evaluated using the classifier and 10-fold cross-validation.
 
-The feature-count range used in the implementation is:
+The implementation evaluates every integer feature count from 100 to 1,000:
 
 ```matlab
 featureCounts = 100:1000;
 ```
 
-Therefore, the code evaluates:
+Therefore:
 
 ```text
 100, 101, 102, ..., 999, 1000
@@ -309,12 +323,14 @@ The loss is calculated as:
 Loss = 1 − Accuracy
 ```
 
-The feature count corresponding to the minimum loss is retained.
+The feature count corresponding to the minimum loss is retained as the **optimal feature count**.
 
 Main code:
 
 ```text
 src/IChi2.m
+src/IChi2_LDA.m
+src/IChi2_kNN.m
 ```
 
 ---
@@ -397,7 +413,7 @@ Equal distance weighting
 10-fold cross-validation
 ```
 
-The MATLAB implementation uses:
+The MATLAB implementation uses MATLAB's `fitcknn` with the corresponding settings:
 
 ```matlab
 fitcknn( ...
@@ -427,7 +443,7 @@ The paper reports the following overall mean classification accuracies:
 | LDA | 86.84% |
 | SVM | 98.88% |
 
-The paper reports these selected feature counts:
+The paper reports the following selected feature counts:
 
 | Channel | Selected features |
 |---|---:|
@@ -456,7 +472,9 @@ The paper reports an F8 SVM accuracy of:
 
 ## 10. Current Reproduction Results
 
-### IChi2 + Cubic SVM
+The following results are from the current MATLAB implementation using the pipeline described in this README.
+
+### 10.1 IChi2 + Cubic SVM
 
 | Channel | Optimal features | Accuracy |
 |---|---:|---:|
@@ -474,8 +492,29 @@ The paper reports an F8 SVM accuracy of:
 | P8 | 805 | 98.036% |
 | T7 | 982 | 98.393% |
 | T8 | 807 | 97.321% |
+| **Mean** | — | **97.844%** |
 
-### IChi2 + LDA
+### 10.2 IChi2 + k-NN
+
+| Channel | Optimal features | Accuracy |
+|---|---:|---:|
+| AF3 | 961 | 95.714% |
+| AF4 | 986 | 95.357% |
+| F3 | 999 | 94.821% |
+| F4 | 888 | 95.357% |
+| F7 | 633 | 95.536% |
+| F8 | 908 | 96.250% |
+| FC5 | 632 | 96.429% |
+| FC6 | 979 | 95.893% |
+| O1 | 865 | 97.143% |
+| O2 | 573 | 94.643% |
+| P7 | 849 | 94.821% |
+| P8 | 987 | 95.179% |
+| T7 | 763 | 95.893% |
+| T8 | 857 | 96.786% |
+| **Mean** | — | **95.702%** |
+
+### 10.3 IChi2 + LDA
 
 | Channel | Optimal features | Accuracy |
 |---|---:|---:|
@@ -493,28 +532,60 @@ The paper reports an F8 SVM accuracy of:
 | P8 | 1000 | 96.250% |
 | T7 | 978 | 93.929% |
 | T8 | 926 | 93.571% |
+| **Mean** | — | **93.622%** |
 
-### IChi2 + k-NN
+### 10.4 Classifier comparison
 
-The all-channel k-NN experiment is configured as:
+The mean accuracies from the current implementation are:
 
-```text
-k = 1
-Manhattan distance
-Equal weighting
-10-fold cross-validation
-Feature counts = 100:1000
-```
+| Classifier | Published mean accuracy | Current reproduction mean accuracy |
+|---|---:|---:|
+| Cubic SVM | 98.88% | **97.844%** |
+| k-NN | 98.31% | **95.702%** |
+| LDA | 86.84% | **93.622%** |
 
-Results are stored in:
-
-```text
-results/IChi2_kNN/
-```
+The published values and the current reproduction values are shown separately so that the results from the paper are not confused with results produced by this implementation.
 
 ---
 
-## 11. Verification Tests
+## 11. Current Reproduction Result Details
+
+### Optimal feature counts
+
+The current implementation evaluates every feature count from 100 to 1,000 and records the feature count giving the minimum cross-validation loss for each channel and classifier.
+
+For the three classifiers, the optimal feature-count ranges are:
+
+| Classifier | Minimum selected | Maximum selected |
+|---|---:|---:|
+| Cubic SVM | 628 | 998 |
+| k-NN | 573 | 999 |
+| LDA | 904 | 1000 |
+
+The values are channel-specific and are retained in the saved result files.
+
+### Result files
+
+The all-channel experiments save individual result files and summary files under the `results` directory. The exact subdirectory can depend on the runner used.
+
+Typical result files include:
+
+```text
+results/IChi2/SVM/
+    AF3_IChi2_SVM_full_results.mat
+    AF4_IChi2_SVM_full_results.mat
+    ...
+    T8_IChi2_SVM_full_results.mat
+    IChi2_SVM_AllChannels_Summary.mat
+```
+
+and corresponding LDA and k-NN result directories.
+
+Each result contains the IChi2 feature counts, accuracies/losses, selected feature ranking information and the optimal result recorded by the corresponding experiment.
+
+---
+
+## 12. Verification Tests
 
 The project includes separate tests for the main stages.
 
@@ -526,12 +597,16 @@ test_FFP_AF3.m
 test_FFP_allChannels.m
 ```
 
+The FFP tests verify the 5 × 5 construction, graph maps and 1,024-feature output.
+
 ### Segmentation
 
 ```text
 test_segmentation.m
 test_5Blocks_TQWTFFP.m
 ```
+
+These tests verify the five non-overlapping segment construction used for the GAMEEMO recordings.
 
 ### TQWT and TQWT + FFP
 
@@ -547,25 +622,40 @@ test_extractTQWTFFP.m
 test_buildChannelDataset.m
 ```
 
-### IChi2 and classifiers
+The dataset construction test verifies the expected 560 instances and 31,744 features per channel.
+
+### Feature ranking and classification
 
 ```text
+test_chiSquareRanking.m
 test_IChi2.m
+test_cubicSVM.m
+test_cubicSVM_synthetic.m
+test_SVM_diagnostic.m
+test_SVM_600.m
+test_kernel_scale.m
+test_LDA_500.m
+```
+
+All-channel experiment runners:
+
+```text
 run_IChi2_AllChannels_Full.m
 run_IChi2_LDA_AllChannels.m
 run_IChi2_kNN_AllChannels.m
+run_IChi2_AllChannels_SVM.m
 ```
 
 ---
 
-## 12. MATLAB Environment
+## 13. MATLAB Environment
 
 ```text
 MATLAB R2024b Update 8
 Windows 11
 ```
 
-Installed toolboxes:
+Installed toolboxes used by the project include:
 
 ```text
 Deep Learning Toolbox
@@ -576,11 +666,15 @@ Statistics and Machine Learning Toolbox
 Wavelet Toolbox
 ```
 
-The project also uses a MATLAB implementation of TQWT.
+The project also uses a MATLAB implementation of TQWT in:
+
+```text
+external/TQWT/
+```
 
 ---
 
-## 13. Configuration
+## 14. Configuration
 
 The main parameters are maintained in `getConfig.m`.
 
@@ -606,7 +700,7 @@ Keeping the main parameters in one configuration file makes it straightforward t
 
 ---
 
-## 14. Project Structure
+## 15. Project Structure
 
 ```text
 FFP_Reproduction/
@@ -657,12 +751,13 @@ FFP_Reproduction/
 │   ├── test_LDA_500.m
 │   ├── run_IChi2_AllChannels_Full.m
 │   ├── run_IChi2_LDA_AllChannels.m
-│   └── run_IChi2_kNN_AllChannels.m
+│   ├── run_IChi2_kNN_AllChannels.m
+│   └── run_IChi2_AllChannels_SVM.m
 │
 ├── results/
-│   ├── IChi2/
-│   ├── LDA/
-│   └── IChi2_kNN/
+│   └── IChi2/
+│       ├── SVM/
+│       └── ...
 │
 ├── getConfig.m
 ├── main.m
@@ -672,7 +767,7 @@ FFP_Reproduction/
 
 ---
 
-## 15. Running the Project
+## 16. Running the Project
 
 ### Load GAMEEMO
 
@@ -690,7 +785,7 @@ datasetTable = buildChannelDataset(dataset, config, 'F8');
 ### Run IChi2 + Cubic SVM
 
 ```matlab
-run_IChi2_AllChannels_Full
+run_IChi2_AllChannels_SVM
 ```
 
 ### Run IChi2 + LDA
@@ -705,27 +800,29 @@ run_IChi2_LDA_AllChannels
 run_IChi2_kNN_AllChannels
 ```
 
+The all-channel runners save each completed channel result before continuing to the next channel. This allows a later run to continue using existing result files.
+
 ---
 
-## 16. Reproduction Sequence
+## 17. Reproduction Sequence
 
-The complete implementation can be run in the following order:
+The complete implementation can be followed in this order:
 
 ```text
 1. Load GAMEEMO
-2. Segment EEG recordings
-3. Extract FFP features
+2. Segment EEG recordings into five non-overlapping segments
+3. Extract FFP features from the original EEG
 4. Apply TQWT
-5. Extract FFP from TQWT components
+5. Extract FFP from the TQWT components
 6. Construct 31,744-feature vectors
 7. Perform min-max normalization
 8. Rank features using Chi-square
 9. Run IChi2 from 100 to 1,000 features
-10. Run cubic SVM
-11. Run LDA
-12. Run k-NN
-13. Calculate classification results
-14. Generate confusion matrices and reported metrics
+10. Evaluate cubic SVM
+11. Evaluate LDA
+12. Evaluate k-NN
+13. Record the optimal feature count and classification accuracy
+14. Save channel-level and all-channel results
 ```
 
 ---
